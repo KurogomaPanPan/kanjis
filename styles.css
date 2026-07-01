@@ -324,7 +324,7 @@ input {
 
 .flashcard-front {
   display: -webkit-box;
-  max-height: 56px;
+  max-height: 53px;
   padding-bottom: 7px;
   overflow: hidden;
   color: var(--text-primary);
