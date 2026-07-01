@@ -159,7 +159,7 @@ function renderHome() {
       <p class="deck-stats">${AppState.deckData.length} chapitres - ${totalCards} cartes</p>
     </div>
     <div class="action-buttons">
-      <button class="action-btn primary" id="viewAllBtn"><span>Voir les cartes</span></button>
+      <button class="action-btn secondary" id="viewAllBtn"><span>Voir les cartes</span></button>
       <button class="action-btn secondary" id="quizAllBtn"><span>Quiz</span></button>
     </div>
     <div class="search-section">
