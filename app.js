@@ -367,7 +367,7 @@ function showCardDetail(chapterIndex, cardIndex) {
 
 function showQuizConfig() {
   const scope = AppState.quizState.config.scope;
-  const cards = getCardsForScope(scope);
+  const cards = getDrawableCardsForScope(scope);
   document.getElementById('quizConfigTitle').textContent = scope === 'all' ? 'Quiz - Toutes les cartes' : `Quiz - ${AppState.deckData[scope].chapter}`;
   document.getElementById('questionCount').max = cards.length;
   document.getElementById('quickMaxBtn').textContent = String(cards.length);
@@ -384,9 +384,13 @@ function getCardsForScope(scope) {
   return chapter ? chapter.cards : [];
 }
 
+function getDrawableCardsForScope(scope) {
+  return getCardsForScope(scope).filter((card) => getSingleKanji(card.back));
+}
+
 function startQuiz() {
   const input = document.getElementById('questionCount');
-  const cards = getCardsForScope(AppState.quizState.config.scope).filter((card) => getSingleKanji(card.back));
+  const cards = getDrawableCardsForScope(AppState.quizState.config.scope);
   const requested = Number.parseInt(input.value, 10) || AppState.quizState.config.count;
   const count = Math.max(1, Math.min(requested, cards.length));
   const selected = AppState.quizState.config.order === 'random'
