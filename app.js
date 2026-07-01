@@ -15,6 +15,9 @@ const AppState = {
     io: null,
     pendingCard: null,
   },
+  scroll: {
+    restoreHomeChapter: null,
+  },
   quizState: {
     questions: [],
     currentQuestionIndex: 0,
@@ -43,6 +46,7 @@ const Router = {
     if (parts.length === 0) {
       renderHome();
       showScreen('home');
+      restoreHomeScroll();
       return;
     }
 
@@ -174,14 +178,38 @@ function renderHome() {
 
   updateHeader('漢字', false);
   home.querySelectorAll('.chapter-item').forEach((item) => {
-    item.addEventListener('click', () => Router.navigate(`/chapter/${item.dataset.chapter}`));
+    item.addEventListener('click', () => {
+      AppState.scroll.restoreHomeChapter = Number.parseInt(item.dataset.chapter, 10);
+      AppState.cardsView.pendingCard = null;
+      Router.navigate(`/chapter/${item.dataset.chapter}`);
+    });
   });
-  document.getElementById('viewAllBtn').addEventListener('click', () => Router.navigate('/view/all'));
+  document.getElementById('viewAllBtn').addEventListener('click', () => {
+    AppState.scroll.restoreHomeChapter = null;
+    AppState.cardsView.pendingCard = null;
+    Router.navigate('/view/all');
+  });
   document.getElementById('quizAllBtn').addEventListener('click', () => {
+    AppState.scroll.restoreHomeChapter = null;
     AppState.quizState.config.scope = 'all';
     Router.navigate('/quiz/config');
   });
   setupSearch();
+}
+
+function restoreHomeScroll() {
+  const chapterIndex = AppState.scroll.restoreHomeChapter;
+  AppState.scroll.restoreHomeChapter = null;
+  window.setTimeout(() => {
+    if (Number.isInteger(chapterIndex)) {
+      const item = document.querySelector(`.chapter-item[data-chapter="${chapterIndex}"]`);
+      if (item) {
+        item.scrollIntoView({ behavior: 'auto', block: 'center' });
+        return;
+      }
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, 0);
 }
 
 function setupSearch() {
@@ -215,8 +243,11 @@ function setupSearch() {
         </div>`).join('')
       : '<div class="search-no-results">Aucune carte trouvée</div>';
     searchResults.style.display = 'block';
-    searchResults.querySelectorAll('.search-result-item').forEach((item) => {
-      item.addEventListener('click', () => Router.navigate(`/chapter/${item.dataset.chapter}/card/${item.dataset.card}`));
+      searchResults.querySelectorAll('.search-result-item').forEach((item) => {
+      item.addEventListener('click', () => {
+        AppState.scroll.restoreHomeChapter = Number.parseInt(item.dataset.chapter, 10);
+        Router.navigate(`/chapter/${item.dataset.chapter}/card/${item.dataset.card}`);
+      });
     });
   });
 
@@ -276,6 +307,8 @@ function showCardsView(chapterIndex) {
       if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
       AppState.cardsView.pendingCard = null;
     }, 50);
+  } else {
+    window.setTimeout(() => window.scrollTo({ top: 0, left: 0, behavior: 'auto' }), 0);
   }
 }
 
@@ -382,7 +415,7 @@ async function renderQuizQuestion() {
   document.getElementById('quizPrompt').textContent = question.front;
   document.getElementById('quizAnswer').textContent = question.back;
   document.getElementById('quizAnswer').style.display = 'none';
-  document.getElementById('quizFeedback').textContent = 'Trace le premier trait.';
+  document.getElementById('quizFeedback').textContent = '';
   document.getElementById('showAnswerBtn').style.display = 'block';
   document.getElementById('nextQuestionBtn').style.display = 'none';
 
@@ -397,10 +430,10 @@ async function renderQuizQuestion() {
   try {
     active.strokeData = await loadStrokeData(kanji);
     active.status = 'ready';
-    document.getElementById('quizFeedback').textContent = `Trait 1 / ${active.strokeData.strokes.length}`;
+    updateQuizStrokeProgress(active);
   } catch (error) {
     active.status = 'error';
-    document.getElementById('quizFeedback').textContent = 'Données de tracé indisponibles. Utilise "Afficher la réponse".';
+    document.getElementById('quizFeedback').textContent = '';
     console.error('KanjiVG load error:', error);
   }
   redrawQuizCanvas();
@@ -489,22 +522,29 @@ function finishStroke(event, canvas, active) {
     active.points = [];
     if (active.currentStrokeIndex >= active.strokeData.strokes.length) {
       active.completed = true;
-      document.getElementById('quizFeedback').textContent = 'Kanji terminé.';
+      updateQuizStrokeProgress(active);
       document.getElementById('showAnswerBtn').style.display = 'none';
       document.getElementById('nextQuestionBtn').style.display = 'block';
       redrawQuizCanvas();
       return;
     }
-    document.getElementById('quizFeedback').textContent = `Trait ${active.currentStrokeIndex + 1} / ${active.strokeData.strokes.length}`;
+    updateQuizStrokeProgress(active);
   } else {
     active.wrongAttempts += 1;
     active.showHint = active.wrongAttempts >= 3;
     active.points = [];
-    document.getElementById('quizFeedback').textContent = active.showHint
-      ? `Regarde le trait ${active.currentStrokeIndex + 1}, puis retrace-le.`
-      : `Trait incorrect. Essai ${active.wrongAttempts} / 3.`;
+    updateQuizStrokeProgress(active);
   }
   redrawQuizCanvas();
+}
+
+function updateQuizStrokeProgress(active) {
+  if (!active || !active.strokeData) {
+    document.getElementById('quizFeedback').textContent = '';
+    return;
+  }
+  const current = Math.min(active.currentStrokeIndex + 1, active.strokeData.strokes.length);
+  document.getElementById('quizFeedback').textContent = `Trait ${current} / ${active.strokeData.strokes.length}`;
 }
 
 function validateDrawnStroke(active) {
@@ -732,7 +772,6 @@ function revealQuizAnswer() {
   document.getElementById('quizAnswer').style.display = 'block';
   document.getElementById('showAnswerBtn').style.display = 'none';
   document.getElementById('nextQuestionBtn').style.display = 'block';
-  document.getElementById('quizFeedback').textContent = 'Réponse affichée.';
   redrawQuizCanvas();
 }
 
@@ -780,7 +819,10 @@ function showScreen(name) {
 
 function updateHeader(title, showBack) {
   document.getElementById('headerTitle').textContent = title;
-  document.getElementById('backBtn').style.display = showBack ? 'block' : 'none';
+  const backBtn = document.getElementById('backBtn');
+  backBtn.style.display = 'flex';
+  backBtn.style.visibility = showBack ? 'visible' : 'hidden';
+  backBtn.disabled = !showBack;
 }
 
 function setupEventHandlers() {
@@ -823,6 +865,11 @@ function smartBack() {
   }
   const { parts } = Router.parseHash();
   if (parts[0] === 'chapter' || (parts[0] === 'view' && parts[1] === 'all') || parts[0] === 'quiz') {
+    if (parts[0] === 'chapter' && parts[1]) {
+      AppState.scroll.restoreHomeChapter = Number.parseInt(parts[1], 10);
+    } else {
+      AppState.scroll.restoreHomeChapter = null;
+    }
     Router.navigate('/');
   } else {
     Router.navigate('/');

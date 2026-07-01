@@ -53,7 +53,8 @@ input {
   position: sticky;
   top: 0;
   z-index: 100;
-  display: flex;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 30px;
   align-items: center;
   gap: var(--spacing-md);
   padding: calc(env(safe-area-inset-top) + 12px) var(--spacing-lg) 12px;
@@ -76,7 +77,6 @@ input {
 }
 
 .header-title {
-  flex: 1;
   overflow: hidden;
   font-size: 17px;
   font-weight: 650;
